@@ -336,8 +336,7 @@ def facts_to_bullets(ccy: str, stats: Dict[str, Any], biggest_structure: str = "
 SYSTEM_PROMPT = (
     "You are a sell-side rates strategist writing factual commentary on daily swap activity by currency.\n"
     "STRICT CONSTRAINTS:\n"
-    "- EXACTLY 2 sentences maximum. NO MORE.\n"
-    "- MAXIMUM 100 words total. Count words carefully.\n"
+    "- EXACTLY 3 sentences maximum. NO MORE.\n"
     "- Write as a single continuous block of text for easy copy-paste.\n"
     "CRITICAL STYLE REQUIREMENTS:\n"
     "- Start with the biggest structure and describe what happened.\n"
@@ -352,7 +351,7 @@ SYSTEM_PROMPT = (
 USER_PROMPT_TEMPLATE = (
     "Write factual commentary for {ccy} using these facts:\n\n"
     "{facts}\n\n"
-    "REQUIREMENTS: Write as a single continuous block of text (no line breaks, no bullets, no paragraphs). EXACTLY 2 sentences maximum. MAXIMUM 100 words total. Start with the BIGGEST STRUCTURE and report what happened. State where activity concentrated. Report DV01 amounts and trade counts. Be purely observational - NO analysis, interpretations, or strategic insights.\n"
+    "REQUIREMENTS: Write as a single continuous block of text (no line breaks, no bullets, no paragraphs). EXACTLY 3 sentences maximum. Start with the BIGGEST STRUCTURE and report what happened. State where activity concentrated. Report DV01 amounts and trade counts. Be purely observational - NO analysis, interpretations, or strategic insights.\n"
 )
 
 # -------------------------------
@@ -378,7 +377,7 @@ def call_openai(messages, model="gpt-4o", temperature=0.1, max_tokens=300):
     )
     return resp.choices[0].message.content.strip()
 
-def enforce_sentence_limit(text, max_sentences=2, max_words=100):
+def enforce_sentence_limit(text, max_sentences=3, max_words=100):
     """Enforce maximum sentence limit and make copy-pasteable"""
     # Remove verbose phrases
     text = text.replace("clustering of maturities", "maturities")
@@ -411,10 +410,10 @@ def enforce_sentence_limit(text, max_sentences=2, max_words=100):
     # Join with spaces for single line output
     result = ' '.join(sentences)
     
-    # Enforce word limit
-    words = result.split()
-    if len(words) > max_words:
-        result = ' '.join(words[:max_words])
+    # Remove word limit to prevent truncation
+    # words = result.split()
+    # if len(words) > max_words:
+    #     result = ' '.join(words[:max_words])
     
     # Ensure it ends with a period if it doesn't already
     if result and not result.rstrip().endswith(('.', '!', '?')):
