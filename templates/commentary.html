@@ -59,11 +59,6 @@
             padding: 25px;
             border-radius: 8px;
             border-left: 4px solid #007bff;
-            cursor: text;
-            user-select: all;
-            -webkit-user-select: all;
-            -moz-user-select: all;
-            -ms-user-select: all;
         }
         .commentary-content h1 {
             color: #007bff;
@@ -122,6 +117,47 @@
             color: #0066cc;
             border-left: 3px solid #007bff;
         }
+        .copy-btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 10px;
+            transition: background-color 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .copy-btn:hover {
+            background-color: #1e7e34;
+        }
+        .copy-btn.success {
+            background-color: #007bff;
+        }
+        .currency-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            position: relative;
+        }
+        .currency-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
@@ -136,8 +172,13 @@
 
         <a href="/" class="back-btn">← Back to Dashboard</a>
 
-        <div class="copy-instruction">
-            📋 <strong>Copy Instructions:</strong> Click anywhere in the commentary below to select all text for easy copy-paste. Each currency commentary is limited to 3-4 sentences.
+        <div class="page-header">
+            <div class="copy-instruction">
+                📋 <strong>Copy Instructions:</strong> Use the copy buttons to copy individual currency sections or the entire page.
+            </div>
+            <button class="copy-btn" onclick="copyAllContent()" id="copyAllBtn">
+                📋 Copy All
+            </button>
         </div>
 
         <div class="commentary-content" id="commentary-content">
@@ -171,6 +212,8 @@
                     const now = new Date();
                     document.querySelector('.timestamp').textContent = 
                         'Last updated: ' + now.toLocaleString();
+                    // Re-initialize copy buttons for new content
+                    addCurrencyCopyButtons();
                 } else {
                     content.innerHTML = '<div class="error">Error: ' + data.error + '</div>';
                 }
@@ -190,6 +233,84 @@
             console.log('Auto-refresh triggered');
             refreshCommentary();
         }, 300000); // 5 minutes
+
+        // Copy all content function
+        function copyAllContent() {
+            const content = document.getElementById('commentary-content').innerText;
+            navigator.clipboard.writeText(content).then(() => {
+                const btn = document.getElementById('copyAllBtn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '✅ Copied!';
+                btn.classList.add('success');
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('success');
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+                alert('Failed to copy to clipboard');
+            });
+        }
+
+        // Copy individual currency section function
+        function copyCurrencySection(currency, button) {
+            const content = document.getElementById('commentary-content').innerText;
+            const lines = content.split('\n');
+            let currencyText = '';
+            let inCurrencySection = false;
+            
+            for (let line of lines) {
+                if (line.startsWith(`**${currency}**`)) {
+                    inCurrencySection = true;
+                    currencyText = line + '\n';
+                } else if (inCurrencySection && line.startsWith('**') && !line.startsWith(`**${currency}**`)) {
+                    break;
+                } else if (inCurrencySection) {
+                    currencyText += line + '\n';
+                }
+            }
+            
+            navigator.clipboard.writeText(currencyText.trim()).then(() => {
+                const originalText = button.innerHTML;
+                button.innerHTML = '✅ Copied!';
+                button.classList.add('success');
+                setTimeout(() => {
+                    button.innerHTML = originalText;
+                    button.classList.remove('success');
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+                alert('Failed to copy to clipboard');
+            });
+        }
+
+        // Parse commentary and add copy buttons for each currency
+        function addCurrencyCopyButtons() {
+            const content = document.getElementById('commentary-content');
+            const html = content.innerHTML;
+            
+            // Find all currency sections (lines starting with **CCY**)
+            const currencyPattern = /\*\*([A-Z]{3})\*\*/g;
+            let match;
+            const currencies = [];
+            
+            while ((match = currencyPattern.exec(html)) !== null) {
+                currencies.push(match[1]);
+            }
+            
+            // Replace currency headers with headers + copy buttons
+            let newHtml = html;
+            currencies.forEach(currency => {
+                const pattern = new RegExp(`(\\*\\*${currency}\\*\\*[^\\n]*)`, 'g');
+                newHtml = newHtml.replace(pattern, 
+                    `$1 <button class="copy-btn" onclick="copyCurrencySection('${currency}', this)">📋 Copy</button>`);
+            });
+            
+            content.innerHTML = newHtml;
+        }
+
+        // Initialize copy buttons when page loads
+        document.addEventListener('DOMContentLoaded', addCurrencyCopyButtons);
     </script>
 </body>
 </html>
