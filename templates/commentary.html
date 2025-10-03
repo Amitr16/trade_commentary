@@ -59,6 +59,11 @@
             padding: 25px;
             border-radius: 8px;
             border-left: 4px solid #007bff;
+            cursor: text;
+            user-select: all;
+            -webkit-user-select: all;
+            -moz-user-select: all;
+            -ms-user-select: all;
         }
         .commentary-content h1 {
             color: #007bff;
@@ -108,6 +113,15 @@
         .back-btn:hover {
             text-decoration: underline;
         }
+        .copy-instruction {
+            background-color: #e7f3ff;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #0066cc;
+            border-left: 3px solid #007bff;
+        }
     </style>
 </head>
 <body>
@@ -121,6 +135,10 @@
         </div>
 
         <a href="/" class="back-btn">← Back to Dashboard</a>
+
+        <div class="copy-instruction">
+            📋 <strong>Copy Instructions:</strong> Click anywhere in the commentary below to select all text for easy copy-paste. Each currency commentary is limited to 3-4 sentences.
+        </div>
 
         <div class="commentary-content" id="commentary-content">
             {{ markdown_content | safe }}

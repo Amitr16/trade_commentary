@@ -19577,3 +19577,5 @@
 2025-10-03 16:57:26,884 - INFO - Added 16 new trades to dtcc_trades.csv
 2025-10-03 16:57:26,884 - INFO - Added 16 new trades from CANADA to CSV
 2025-10-03 16:57:26,884 - INFO - Fetch cycle completed: 116 total processed, 21 new trades added
+2025-10-03 17:04:39,052 - INFO - Loaded 612 existing dissemination IDs
+2025-10-03 17:04:39,053 - INFO - Loaded 119 existing original dissemination IDs

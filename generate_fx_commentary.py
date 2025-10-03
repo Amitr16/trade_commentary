@@ -311,30 +311,31 @@ def facts_to_bullets(ccy: str, stats: Dict[str, Any], biggest_structure: str = "
 # LLM prompt
 # -------------------------------
 SYSTEM_PROMPT = (
-    "You are a sell-side rates strategist writing crisp, one-paragraph commentary on daily swap activity by currency.\n"
-    "Constraints:\n"
-    "- One paragraph (3-6 sentences), no bullets.\n"
+    "You are a sell-side rates strategist writing ultra-concise commentary on daily swap activity by currency.\n"
+    "STRICT CONSTRAINTS:\n"
+    "- EXACTLY 3-4 sentences maximum. NO MORE.\n"
+    "- NO bullets, NO paragraphs, NO line breaks.\n"
     "- ALWAYS start with the biggest structure for this currency (highlighted as BIGGEST STRUCTURE).\n"
     "- Lead with where activity concentrates on the curve (belly/front/long end).\n"
     "- ALWAYS focus on DV01 metrics when available - do NOT mention notional amounts.\n"
     "- Mention most traded structures and largest DV01 buckets.\n"
     "- Note average DV01 per trade and total DV01 flow in round figures.\n"
-    "- Highlight common trade structures that indicate systematic trading patterns.\n"
     "- Finish with an interpretation (e.g., hedging/ALM vs RV), without over-claiming.\n"
     "- Never reference notional amounts - use DV01 exclusively for all risk metrics.\n"
+    "- Write as a single continuous block of text for easy copy-paste.\n"
     "Avoid numbers beyond what is given; round to whole thousands/millions where sensible; keep tone neutral and professional.\n"
 )
 
 USER_PROMPT_TEMPLATE = (
-    "Write a neat one-paragraph summary for {ccy} using only these facts:\n\n"
+    "Write a concise 3-4 sentence summary for {ccy} using only these facts:\n\n"
     "{facts}\n\n"
-    "Style: Same voice as the JPY example you were shown previously — concise, professional, no bullets. Do not invent data.\n"
+    "CRITICAL: Write as a single continuous block of text (no line breaks, no bullets, no paragraphs). Maximum 4 sentences. Start with BIGGEST STRUCTURE if available. Do not invent data.\n"
 )
 
 # -------------------------------
 # OpenAI client (lazy import)
 # -------------------------------
-def call_openai(messages, model="gpt-4o", temperature=0.2, max_tokens=220):
+def call_openai(messages, model="gpt-4o", temperature=0.1, max_tokens=150):
     """Requires OPENAI_API_KEY in environment."""
     try:
         from openai import OpenAI
@@ -353,6 +354,34 @@ def call_openai(messages, model="gpt-4o", temperature=0.2, max_tokens=220):
         max_tokens=max_tokens,
     )
     return resp.choices[0].message.content.strip()
+
+def enforce_sentence_limit(text, max_sentences=4):
+    """Enforce maximum sentence limit and make copy-pasteable"""
+    # Split by sentence endings
+    sentences = []
+    current_sentence = ""
+    
+    for char in text:
+        current_sentence += char
+        if char in '.!?' and len(current_sentence.strip()) > 10:  # Avoid splitting on abbreviations
+            sentences.append(current_sentence.strip())
+            current_sentence = ""
+    
+    # Add remaining text if any
+    if current_sentence.strip():
+        sentences.append(current_sentence.strip())
+    
+    # Take only the first max_sentences
+    sentences = sentences[:max_sentences]
+    
+    # Join with spaces for single line output
+    result = ' '.join(sentences)
+    
+    # Ensure it ends with a period if it doesn't already
+    if result and not result.rstrip().endswith(('.', '!', '?')):
+        result = result.rstrip() + '.'
+    
+    return result
 
 # -------------------------------
 # Main pipeline
@@ -478,7 +507,9 @@ def main():
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": USER_PROMPT_TEMPLATE.format(ccy=str(ccy), facts=facts)}
             ]
-            commentary = call_openai(messages, model=args.model)
+            raw_commentary = call_openai(messages, model=args.model)
+            # Enforce 3-4 sentence limit and make copy-pasteable
+            commentary = enforce_sentence_limit(raw_commentary, max_sentences=4)
 
         outputs.append({"currency": str(ccy), "trade_date": target.strftime("%Y-%m-%d"), "commentary": commentary})
         md_lines.append(f"**{ccy}** — {commentary}")
