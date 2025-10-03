@@ -16,7 +16,7 @@ from typing import Dict, Any, List, Tuple, Optional
 # -------------------------------
 CANDIDATE_COLS = {
     "currency": ["currency", "ccy", "curve_ccy", "ccy_leg", "pair", "tenor_ccy"],
-    "trade_date": ["trade_date", "date", "tradedate", "execution_date", "exec_date", "trade time", "created at"],
+    "trade_date": ["trade_date", "date", "tradedate", "execution_date", "exec_date", "trade time", "created at", "trade time"],
     "notional": ["notional", "size", "quantity", "qty", "nominal", "amount", "notional_amount", "notionals"],
     "dv01": ["dv01", "dv", "dollar_value", "dollar_value_of_01"],
     "maturity": ["maturity", "maturity_date", "end_date", "expiry", "expiration_date", "expiration date"],
@@ -423,8 +423,7 @@ def main():
     p.add_argument("--out_csv", default="daily_commentary.csv", help="Output CSV path")
     p.add_argument("--out_md", default="daily_commentary.md", help="Output Markdown path")
     p.add_argument("--date", default=None, help="Trade date to filter (YYYY-MM-DD). Defaults to latest date in file.")
-    p.add_argument("--dry_run", action="store_true", help="If set, do not call OpenAI; output facts only.")
-    p.add_argument("--model", default="gpt-4o", help="OpenAI chat model name")
+    p.add_argument("--model", default="gpt-4o", help="OpenAI chat model name (default: gpt-4o)")
     args = p.parse_args()
 
     df = pd.read_csv(args.csv_path)
@@ -473,21 +472,52 @@ def main():
     if dv01_col and dv01_col in day_df.columns:
         day_df[dv01_col] = day_df[dv01_col].apply(to_float)
 
-    # Top 5 individual trades by DV01 (currency agnostic)
+    # Top 5 individual trades by DV01 from the last hour
     top_individual_trades = []
     
     if dv01_col and dv01_col in day_df.columns:
-        # Create list of individual trades with DV01
-        trades_with_dv01 = []
-        effective_bucket_col = find_col(day_df, "effective_bucket")
-        expiration_bucket_col = find_col(day_df, "expiration_bucket")
+        # Find trade time column
+        trade_time_col = None
+        for col in day_df.columns:
+            if col.lower() in ['trade time', 'trade_time', 'created at', 'timestamp']:
+                trade_time_col = col
+                break
         
-        for idx, row in day_df.iterrows():
+        if not trade_time_col:
+            # Try finding by pattern
+            for col in day_df.columns:
+                if 'time' in col.lower() or 'created' in col.lower():
+                    trade_time_col = col
+                    break
+        
+        # Filter trades from last hour if trade time column exists
+        last_hour_df = day_df
+        if trade_time_col and trade_time_col in day_df.columns:
+            try:
+                # Parse trade times
+                day_df['_trade_time'] = pd.to_datetime(day_df[trade_time_col], errors='coerce', utc=True)
+                if not day_df['_trade_time'].isna().all():
+                    # Get the latest trade time
+                    latest_time = day_df['_trade_time'].max()
+                    if pd.notna(latest_time):
+                        # Filter to last hour
+                        one_hour_ago = latest_time - pd.Timedelta(hours=1)
+                        last_hour_df = day_df[day_df['_trade_time'] >= one_hour_ago].copy()
+            except Exception as e:
+                print(f"Warning: Could not filter by trade time: {e}")
+                last_hour_df = day_df
+        
+        # Create list of individual trades with DV01 from last hour
+        trades_with_dv01 = []
+        effective_bucket_col = find_col(last_hour_df, "effective_bucket")
+        expiration_bucket_col = find_col(last_hour_df, "expiration_bucket")
+        
+        for idx, row in last_hour_df.iterrows():
             dv01_val = float(row[dv01_col]) if pd.notna(row[dv01_col]) else 0.0
             currency = str(row[ccy_col]).strip()
             
             # Create structure description
-            if effective_bucket_col and expiration_bucket_col and effective_bucket_col in day_df.columns and expiration_bucket_col in day_df.columns:
+            if effective_bucket_col and expiration_bucket_col and effective_bucket_col in last_hour_df.columns and expiration_bucket_col in last_hour_df.columns:
                 effective_bucket = str(row[effective_bucket_col]).strip() if pd.notna(row[effective_bucket_col]) else ""
                 expiration_bucket = str(row[expiration_bucket_col]).strip() if pd.notna(row[expiration_bucket_col]) else ""
                 if effective_bucket and expiration_bucket:
@@ -533,16 +563,14 @@ def main():
         
         facts = facts_to_bullets(str(ccy), stats, biggest_structure_for_currency)
 
-        if args.dry_run:
-            commentary = "(dry-run) " + facts.replace("\n", " ")
-        else:
-            messages = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": USER_PROMPT_TEMPLATE.format(ccy=str(ccy), facts=facts)}
-            ]
-            raw_commentary = call_openai(messages, model=args.model)
-            # Enforce 3 sentence limit and make copy-pasteable
-            commentary = enforce_sentence_limit(raw_commentary, max_sentences=3)
+        # Always use GPT-4 for intelligent commentary
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": USER_PROMPT_TEMPLATE.format(ccy=str(ccy), facts=facts)}
+        ]
+        raw_commentary = call_openai(messages, model=args.model)
+        # Enforce 3 sentence limit and make copy-pasteable
+        commentary = enforce_sentence_limit(raw_commentary, max_sentences=3)
 
         outputs.append({"currency": str(ccy), "trade_date": target.strftime("%Y-%m-%d"), "commentary": commentary})
         md_lines.append(f"**{ccy}** — {commentary}")

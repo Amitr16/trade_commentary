@@ -63,8 +63,15 @@ if __name__ == '__main__':
     else:
         # Development mode (local)
         print("Starting DTCC Commentary Web App locally...")
-        print("Note: Run dtcc_fetcher.py separately in another terminal")
+        print("Starting dtcc_fetcher.py in background...")
         print("Open your browser and go to: http://localhost:5000")
         
-        # Just start the web app locally
+        # Start dtcc_fetcher in background thread
+        fetcher_thread = threading.Thread(target=run_fetcher, daemon=True)
+        fetcher_thread.start()
+        
+        # Wait a bit for fetcher to initialize
+        time.sleep(5)
+        
+        # Start the web app (this will block)
         run_webapp()
