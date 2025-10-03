@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DTCC Trade Commentary</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .nav-buttons {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            margin: 0 10px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .btn-success {
+            background-color: #28a745;
+        }
+        .btn-success:hover {
+            background-color: #1e7e34;
+        }
+        .info-box {
+            background-color: #e9ecef;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .status {
+            text-align: center;
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .status.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>DTCC Trade Commentary Dashboard</h1>
+        
+        <div class="info-box">
+            <h3>About This Application</h3>
+            <p>This web application provides AI-generated commentary on DTCC trade data. The system consists of:</p>
+            <ul>
+                <li><strong>DTCC Fetcher:</strong> Runs every minute to collect trade data and update dtcc_trades.csv</li>
+                <li><strong>Commentary Generator:</strong> Creates AI-powered analysis using OpenAI GPT</li>
+                <li><strong>Web Interface:</strong> Displays the commentary with real-time refresh capability</li>
+            </ul>
+        </div>
+
+        <div class="nav-buttons">
+            <a href="/commentary" class="btn">View Commentary</a>
+            <a href="/generate" class="btn btn-success" onclick="return confirm('Generate new commentary? This will call OpenAI API.')">Generate New Commentary</a>
+        </div>
+
+        <div class="status info">
+            <p><strong>Current Status:</strong> Ready to generate and display trade commentary</p>
+            <p><strong>Data Source:</strong> dtcc_trades.csv (updated every minute by DTCC fetcher)</p>
+            <p><strong>Last Updated:</strong> Check commentary page for latest timestamp</p>
+        </div>
+    </div>
+</body>
+</html>

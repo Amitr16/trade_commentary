@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error - DTCC Trade Commentary</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .error-box {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 20px;
+            border-radius: 5px;
+            border-left: 4px solid #dc3545;
+            margin-bottom: 20px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            margin: 0 10px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        .btn-secondary:hover {
+            background-color: #545b62;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Error Occurred</h1>
+        
+        <div class="error-box">
+            <h3>Error Details:</h3>
+            <p>{{ error }}</p>
+        </div>
+
+        <div style="text-align: center;">
+            <a href="/" class="btn">Back to Dashboard</a>
+            <a href="/commentary" class="btn btn-secondary">View Existing Commentary</a>
+        </div>
+
+        <div style="margin-top: 30px; padding: 20px; background-color: #e9ecef; border-radius: 5px;">
+            <h3>Troubleshooting Tips:</h3>
+            <ul>
+                <li>Check if dtcc_trades.csv has data</li>
+                <li>Verify OPENAI_API_KEY is set correctly</li>
+                <li>Ensure the DTCC fetcher is running</li>
+                <li>Check the application logs for more details</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: dtcc-commentary-webapp
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements_webapp.txt
+    startCommand: python start_with_fetcher.py
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: FLASK_ENV
+        value: production
+      - key: RENDER
+        value: true
+    healthCheckPath: /
+    autoDeploy: true
+    branch: main
