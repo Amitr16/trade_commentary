@@ -313,29 +313,28 @@ def facts_to_bullets(ccy: str, stats: Dict[str, Any], biggest_structure: str = "
 SYSTEM_PROMPT = (
     "You are a sell-side rates strategist writing ultra-concise commentary on daily swap activity by currency.\n"
     "STRICT CONSTRAINTS:\n"
-    "- EXACTLY 3-4 sentences maximum. NO MORE.\n"
-    "- NO bullets, NO paragraphs, NO line breaks.\n"
+    "- EXACTLY 3 sentences maximum. NO MORE.\n"
+    "- NO bullets, NO paragraphs, NO line breaks, NO verbose explanations.\n"
+    "- NO mention of 'clustering of maturities', 'systematic approach', or detailed interpretations.\n"
     "- ALWAYS start with the biggest structure for this currency (highlighted as BIGGEST STRUCTURE).\n"
     "- Lead with where activity concentrates on the curve (belly/front/long end).\n"
     "- ALWAYS focus on DV01 metrics when available - do NOT mention notional amounts.\n"
-    "- Mention most traded structures and largest DV01 buckets.\n"
-    "- Note average DV01 per trade and total DV01 flow in round figures.\n"
-    "- Finish with an interpretation (e.g., hedging/ALM vs RV), without over-claiming.\n"
-    "- Never reference notional amounts - use DV01 exclusively for all risk metrics.\n"
+    "- Mention only the most important DV01 buckets and structures.\n"
+    "- Keep it brief and factual - no lengthy analysis.\n"
     "- Write as a single continuous block of text for easy copy-paste.\n"
     "Avoid numbers beyond what is given; round to whole thousands/millions where sensible; keep tone neutral and professional.\n"
 )
 
 USER_PROMPT_TEMPLATE = (
-    "Write a concise 3-4 sentence summary for {ccy} using only these facts:\n\n"
+    "Write a very concise 3-sentence summary for {ccy} using only these facts:\n\n"
     "{facts}\n\n"
-    "CRITICAL: Write as a single continuous block of text (no line breaks, no bullets, no paragraphs). Maximum 4 sentences. Start with BIGGEST STRUCTURE if available. Do not invent data.\n"
+    "CRITICAL: Write as a single continuous block of text (no line breaks, no bullets, no paragraphs). EXACTLY 3 sentences maximum. Start with BIGGEST STRUCTURE. Be brief and factual - no verbose analysis or interpretations. Do not invent data.\n"
 )
 
 # -------------------------------
 # OpenAI client (lazy import)
 # -------------------------------
-def call_openai(messages, model="gpt-4o", temperature=0.1, max_tokens=150):
+def call_openai(messages, model="gpt-4o", temperature=0.1, max_tokens=100):
     """Requires OPENAI_API_KEY in environment."""
     try:
         from openai import OpenAI
@@ -355,8 +354,19 @@ def call_openai(messages, model="gpt-4o", temperature=0.1, max_tokens=150):
     )
     return resp.choices[0].message.content.strip()
 
-def enforce_sentence_limit(text, max_sentences=4):
+def enforce_sentence_limit(text, max_sentences=3):
     """Enforce maximum sentence limit and make copy-pasteable"""
+    # Remove verbose phrases
+    text = text.replace("clustering of maturities", "maturities")
+    text = text.replace("systematic approach", "activity")
+    text = text.replace("likely driven by hedging or asset-liability management strategies", "hedging activity")
+    text = text.replace("suggesting a focus on", "indicating")
+    text = text.replace("potentially indicating", "indicating")
+    text = text.replace("This pattern suggests", "Activity suggests")
+    text = text.replace("The concentration of trades", "Trades concentrate")
+    text = text.replace("The prevalence of trades", "Trades show")
+    text = text.replace("The systematic nature of these trades", "These trades")
+    
     # Split by sentence endings
     sentences = []
     current_sentence = ""
@@ -508,8 +518,8 @@ def main():
                 {"role": "user", "content": USER_PROMPT_TEMPLATE.format(ccy=str(ccy), facts=facts)}
             ]
             raw_commentary = call_openai(messages, model=args.model)
-            # Enforce 3-4 sentence limit and make copy-pasteable
-            commentary = enforce_sentence_limit(raw_commentary, max_sentences=4)
+            # Enforce 3 sentence limit and make copy-pasteable
+            commentary = enforce_sentence_limit(raw_commentary, max_sentences=3)
 
         outputs.append({"currency": str(ccy), "trade_date": target.strftime("%Y-%m-%d"), "commentary": commentary})
         md_lines.append(f"**{ccy}** — {commentary}")
