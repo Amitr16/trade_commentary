@@ -19,12 +19,16 @@ CSV_FILE = "dtcc_trades.csv"
 COMMENTARY_CSV = "daily_commentary.csv"
 COMMENTARY_MD = "daily_commentary.md"
 
-def generate_commentary(date_filter=None):
+def generate_commentary(date_filter=None, include_yesterday=False, yesterday_only=False):
     """Generate commentary using the existing script"""
     try:
         cmd = ["python", "generate_fx_commentary.py", CSV_FILE]
         if date_filter:
             cmd.extend(["--date", date_filter])
+        if include_yesterday:
+            cmd.append("--include_yesterday")
+        if yesterday_only:
+            cmd.append("--yesterday_only")
         
         # Run the commentary generation
         result = subprocess.run(cmd, capture_output=True, text=True)
@@ -145,8 +149,16 @@ def api_commentary():
 @app.route('/api/refresh', methods=['POST'])
 def api_refresh():
     """API endpoint to refresh commentary"""
-    date_filter = request.json.get('date') if request.json else None
-    success, message = generate_commentary(date_filter)
+    if request.json:
+        date_filter = request.json.get('date')
+        include_yesterday = request.json.get('include_yesterday', False)
+        yesterday_only = request.json.get('yesterday_only', False)
+    else:
+        date_filter = None
+        include_yesterday = False
+        yesterday_only = False
+    
+    success, message = generate_commentary(date_filter, include_yesterday, yesterday_only)
     
     if success:
         markdown_content = load_markdown_commentary()

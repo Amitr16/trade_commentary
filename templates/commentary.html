@@ -49,6 +49,24 @@
             background-color: #6c757d;
             cursor: not-allowed;
         }
+        .yesterday-btn {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-left: 10px;
+            transition: background-color 0.3s;
+        }
+        .yesterday-btn:hover {
+            background-color: #c82333;
+        }
+        .yesterday-btn:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
         .timestamp {
             color: #666;
             font-size: 14px;
@@ -167,7 +185,10 @@
                 <h1>Daily Trade Commentary</h1>
                 <div class="timestamp">Last updated: {{ current_time }}</div>
             </div>
-            <button class="refresh-btn" onclick="refreshCommentary()">Refresh Commentary</button>
+            <div>
+                <button class="refresh-btn" onclick="refreshCommentary()">Refresh Commentary</button>
+                <button class="yesterday-btn" onclick="refreshYesterdayCommentary()">Yesterday Commentary</button>
+            </div>
         </div>
 
         <a href="/" class="back-btn">← Back to Dashboard</a>
@@ -228,11 +249,46 @@
             });
         }
 
-        // Auto-refresh every 5 minutes
-        setInterval(() => {
-            console.log('Auto-refresh triggered');
-            refreshCommentary();
-        }, 300000); // 5 minutes
+        function refreshYesterdayCommentary() {
+            const btn = document.querySelector('.yesterday-btn');
+            const content = document.getElementById('commentary-content');
+            
+            // Disable button and show loading
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+            content.innerHTML = '<div class="loading">Generating yesterday commentary... This may take a moment.</div>';
+            
+            // Make API call for yesterday only
+            fetch('/api/refresh', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({yesterday_only: true})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    content.innerHTML = data.html_content;
+                    // Update timestamp
+                    const now = new Date();
+                    document.querySelector('.timestamp').textContent = 
+                        'Last updated: ' + now.toLocaleString();
+                    // Re-initialize copy buttons for new content
+                    addCurrencyCopyButtons();
+                } else {
+                    content.innerHTML = '<div class="error">Error: ' + data.error + '</div>';
+                }
+            })
+            .catch(error => {
+                content.innerHTML = '<div class="error">Network error: ' + error.message + '</div>';
+            })
+            .finally(() => {
+                // Re-enable button
+                btn.disabled = false;
+                btn.textContent = 'Yesterday Commentary';
+            });
+        }
 
         // Copy all content function
         function copyAllContent() {

@@ -296,32 +296,32 @@ def facts_to_bullets(ccy: str, stats: Dict[str, Any], biggest_structure: str = "
         bullets.append(f"Average trade size: ~{stats.get('avg_trade_size',0):,.0f}")
     
     if stats.get("top_buckets"):
-        if stats.get('total_dv01', 0) > 0:
+        if stats.get('total_dv01', 0) > 0 and 'dv01' in stats["top_buckets"][0]:
             # DV01-based buckets
             tops = ", ".join([f"{b['bucket']} (~{format_dv01_k(b['dv01'])} DV01)" for b in stats["top_buckets"][:3]])
             bullets.append(f"Top tenor buckets by DV01: {tops}")
-        else:
+        elif 'notional' in stats["top_buckets"][0]:
             # Notional-based buckets
             tops = ", ".join([f"{b['bucket']} (~{b['notional']:,.0f})" for b in stats["top_buckets"][:3]])
             bullets.append(f"Top tenor buckets by notional: {tops}")
     
     # Trade structures (most traded by DV01)
     if stats.get("trade_structures"):
-        if stats.get('total_dv01', 0) > 0 and 'dv01' in str(stats["trade_structures"]):
+        if stats.get('total_dv01', 0) > 0 and 'dv01' in stats["trade_structures"][0]:
             # Use DV01 for trade structures
             structures = ", ".join([f"{x['structure']} ({x['count']} trades, ~{format_dv01_k(x['dv01'])} DV01)" for x in stats["trade_structures"][:2]])
             bullets.append(f"Most traded structures (by DV01): {structures}")
-        else:
+        elif 'notional' in stats["trade_structures"][0]:
             # Fallback to notional only if DV01 not available
             structures = ", ".join([f"{x['structure']} ({x['count']} trades, ~{x['notional']:,.0f})" for x in stats["trade_structures"][:2]])
             bullets.append(f"Most traded structures (by notional): {structures}")
     
     if stats.get("maturity_clusters"):
-        if stats.get('total_dv01', 0) > 0 and 'dv01' in str(stats["maturity_clusters"]):
+        if stats.get('total_dv01', 0) > 0 and 'dv01' in stats["maturity_clusters"][0]:
             # Use DV01 for maturity clusters
             yrs = ", ".join([f"{x['year']} (~{format_dv01_k(x['dv01'])} DV01)" for x in stats["maturity_clusters"]])
             bullets.append(f"Maturity clusters (by DV01): {yrs}")
-        else:
+        elif 'notional' in stats["maturity_clusters"][0]:
             # Fallback to notional only if DV01 not available
             yrs = ", ".join([f"{x['year']} (~{x['notional']:,.0f})" for x in stats["maturity_clusters"]])
             bullets.append(f"Maturity clusters (by notional): {yrs}")
@@ -332,30 +332,31 @@ def facts_to_bullets(ccy: str, stats: Dict[str, Any], biggest_structure: str = "
 # LLM prompt
 # -------------------------------
 SYSTEM_PROMPT = (
-    "You are a sell-side rates strategist writing ultra-concise commentary on daily swap activity by currency.\n"
+    "You are a sell-side rates strategist writing intelligent, analytical commentary on daily swap activity by currency.\n"
     "STRICT CONSTRAINTS:\n"
     "- EXACTLY 3 sentences maximum. NO MORE.\n"
-    "- NO bullets, NO paragraphs, NO line breaks, NO verbose explanations.\n"
-    "- NO mention of 'clustering of maturities', 'systematic approach', or detailed interpretations.\n"
-    "- ALWAYS start with the biggest structure for this currency (highlighted as BIGGEST STRUCTURE).\n"
-    "- Lead with where activity concentrates on the curve (belly/front/long end).\n"
-    "- ALWAYS focus on DV01 metrics when available - do NOT mention notional amounts.\n"
-    "- Mention only the most important DV01 buckets and structures.\n"
-    "- Keep it brief and factual - no lengthy analysis.\n"
     "- Write as a single continuous block of text for easy copy-paste.\n"
-    "Avoid numbers beyond what is given; round to whole thousands/millions where sensible; keep tone neutral and professional.\n"
+    "CRITICAL STYLE REQUIREMENTS:\n"
+    "- Start with the biggest structure and provide intelligent analysis of what it means.\n"
+    "- Explain WHERE activity concentrates on the curve (belly/front/long end) and WHY this matters.\n"
+    "- Connect the dots between different tenor buckets and suggest what this indicates about market strategy.\n"
+    "- Use phrases like 'concentrated in', 'suggests', 'consistent with', 'indicating'.\n"
+    "- Focus on DV01 metrics and interpret their significance.\n"
+    "- Provide strategic insight about liability management, relative value, or hedging patterns.\n"
+    "- Be analytical and intelligent - explain the implications, not just list facts.\n"
+    "Tone: Professional, analytical, insightful. Avoid meaningless repetition or verbose explanations.\n"
 )
 
 USER_PROMPT_TEMPLATE = (
-    "Write a very concise 3-sentence summary for {ccy} using only these facts:\n\n"
+    "Write intelligent, analytical commentary for {ccy} using these facts:\n\n"
     "{facts}\n\n"
-    "CRITICAL: Write as a single continuous block of text (no line breaks, no bullets, no paragraphs). EXACTLY 3 sentences maximum. Start with BIGGEST STRUCTURE. Be brief and factual - no verbose analysis or interpretations. Do not invent data.\n"
+    "REQUIREMENTS: Write as a single continuous block of text (no line breaks, no bullets, no paragraphs). EXACTLY 3 sentences maximum. Start with the BIGGEST STRUCTURE and provide strategic analysis. Connect the dots between different tenor buckets and explain what this activity suggests about market positioning, liability management, or relative value strategies. Be analytical and insightful, not just descriptive.\n"
 )
 
 # -------------------------------
 # OpenAI client (lazy import)
 # -------------------------------
-def call_openai(messages, model="gpt-4o", temperature=0.1, max_tokens=100):
+def call_openai(messages, model="gpt-4o", temperature=0.1, max_tokens=150):
     """Requires OPENAI_API_KEY in environment."""
     try:
         from openai import OpenAI
@@ -424,6 +425,8 @@ def main():
     p.add_argument("--out_md", default="daily_commentary.md", help="Output Markdown path")
     p.add_argument("--date", default=None, help="Trade date to filter (YYYY-MM-DD). Defaults to latest date in file.")
     p.add_argument("--model", default="gpt-4o", help="OpenAI chat model name (default: gpt-4o)")
+    p.add_argument("--include_yesterday", action="store_true", help="Include yesterday's day-end commentary")
+    p.add_argument("--yesterday_only", action="store_true", help="Generate only yesterday's commentary")
     args = p.parse_args()
 
     df = pd.read_csv(args.csv_path)
@@ -539,48 +542,163 @@ def main():
             trades_with_dv01.sort(key=lambda x: x["dv01"], reverse=True)
             top_individual_trades = trades_with_dv01[:5]
 
-    # Group by currency
+    # Find yesterday's date (if available in data and requested)
+    yesterday_outputs = []
+    yesterday_md_lines = []
+    
+    if args.include_yesterday or args.yesterday_only:
+        # Get all available dates and find the most recent previous date
+        all_dates = sorted(df["_trade_date"].dropna().unique())
+        if len(all_dates) > 1:
+            yesterday_date = all_dates[-2]  # Second most recent date
+            
+            # Filter to yesterday's trades
+            yesterday_mask = df["_trade_date"] == yesterday_date
+            yesterday_df = df.loc[yesterday_mask].copy()
+            
+            if not yesterday_df.empty:
+                # Clean numeric notional and DV01 for yesterday's data
+                def to_float(x):
+                    try:
+                        s = str(x).replace(",", "")
+                        return float(s)
+                    except Exception:
+                        return math.nan
+                yesterday_df[noz_col] = yesterday_df[noz_col].apply(to_float)
+                yesterday_df = yesterday_df.dropna(subset=[noz_col])
+                
+                # Clean DV01 column if it exists
+                if dv01_col and dv01_col in yesterday_df.columns:
+                    yesterday_df[dv01_col] = yesterday_df[dv01_col].apply(to_float)
+                
+                yesterday_md_lines.append(f"# Day-End Commentary ({yesterday_date.strftime('%Y-%m-%d')})")
+                yesterday_md_lines.append("")
+                
+                # Add top 5 trades for yesterday at the top
+                if yesterday_df is not None and dv01_col and dv01_col in yesterday_df.columns:
+                    # Get yesterday's top 5 trades
+                    yesterday_trades_with_dv01 = []
+                    effective_bucket_col = find_col(yesterday_df, "effective_bucket")
+                    expiration_bucket_col = find_col(yesterday_df, "expiration_bucket")
+                    
+                    for idx, row in yesterday_df.iterrows():
+                        dv01_val = float(row[dv01_col]) if pd.notna(row[dv01_col]) else 0.0
+                        currency = str(row[ccy_col]).strip()
+                        
+                        # Create structure description
+                        if effective_bucket_col and expiration_bucket_col and effective_bucket_col in yesterday_df.columns and expiration_bucket_col in yesterday_df.columns:
+                            effective_bucket = str(row[effective_bucket_col]).strip() if pd.notna(row[effective_bucket_col]) else ""
+                            expiration_bucket = str(row[expiration_bucket_col]).strip() if pd.notna(row[expiration_bucket_col]) else ""
+                            if effective_bucket and expiration_bucket:
+                                structure_desc = f"{effective_bucket} → {expiration_bucket}"
+                            else:
+                                structure_desc = f"{currency} trade"
+                        else:
+                            structure_desc = f"{currency} trade"
+                        
+                        yesterday_trades_with_dv01.append({
+                            "structure": structure_desc,
+                            "currency": currency,
+                            "dv01": abs(dv01_val),
+                            "trade_id": idx
+                        })
+                    
+                    # Sort by DV01 and get top 5
+                    if yesterday_trades_with_dv01:
+                        yesterday_trades_with_dv01.sort(key=lambda x: x["dv01"], reverse=True)
+                        yesterday_top_trades = yesterday_trades_with_dv01[:5]
+                        
+                        yesterday_md_lines.append(f"## Top 5 Trades on {yesterday_date.strftime('%Y-%m-%d')}")
+                        for i, trade in enumerate(yesterday_top_trades, 1):
+                            dv01_k = format_dv01_k(trade['dv01'])
+                            yesterday_md_lines.append(f"{i}. **{trade['structure']}** - ~{dv01_k} DV01 ({trade['currency']})")
+                        yesterday_md_lines.append("")
+                
+                # Generate yesterday's commentary by currency
+                for ccy, g in yesterday_df.groupby(ccy_col):
+                    stats = summarize_currency(g, ccy_col, noz_col, yesterday_date, dv01_col=dv01_col, maturity_col=mat_col, tenor_col=ten_col)
+                    
+                    # Find biggest structure for this currency
+                    biggest_structure_for_currency = ""
+                    if stats.get("trade_structures") and stats.get('total_dv01', 0) > 0:
+                        biggest_structure = stats["trade_structures"][0]  # Already sorted by DV01
+                        dv01_k = format_dv01_k(biggest_structure['dv01'])
+                        biggest_structure_for_currency = f"{biggest_structure['structure']} (~{dv01_k} DV01)"
+                    
+                    facts = facts_to_bullets(str(ccy), stats, biggest_structure_for_currency)
+                    
+                    # Generate yesterday's commentary
+                    messages = [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": USER_PROMPT_TEMPLATE.format(ccy=str(ccy), facts=facts)}
+                    ]
+                    raw_commentary = call_openai(messages, model=args.model)
+                    commentary = enforce_sentence_limit(raw_commentary, max_sentences=3)
+                    
+                    yesterday_outputs.append({"currency": str(ccy), "trade_date": yesterday_date.strftime("%Y-%m-%d"), "commentary": commentary})
+                    yesterday_md_lines.append(f"**{ccy}** — {commentary}")
+
+    # Group by currency for today (unless yesterday_only is requested)
     outputs = []
-    md_lines = [f"# Daily Swap Commentary ({target.strftime('%Y-%m-%d')})", ""]
+    md_lines = []
     
-    # Add top individual trades summary at the top
-    if top_individual_trades:
-        md_lines.append("## Top 5 Trades by DV01 (Past 1 Hour)")
-        for i, trade in enumerate(top_individual_trades, 1):
-            dv01_k = format_dv01_k(trade['dv01'])
-            md_lines.append(f"{i}. **{trade['structure']}** - ~{dv01_k} DV01 ({trade['currency']})")
-        md_lines.append("")
+    if not args.yesterday_only:
+        md_lines = [f"# Daily Swap Commentary ({target.strftime('%Y-%m-%d')})", ""]
+        
+        # Add top individual trades summary at the top
+        if top_individual_trades:
+            md_lines.append("## Top 5 Trades by DV01 (Past 1 Hour)")
+            for i, trade in enumerate(top_individual_trades, 1):
+                dv01_k = format_dv01_k(trade['dv01'])
+                md_lines.append(f"{i}. **{trade['structure']}** - ~{dv01_k} DV01 ({trade['currency']})")
+            md_lines.append("")
     
-    for ccy, g in day_df.groupby(ccy_col):
-        stats = summarize_currency(g, ccy_col, noz_col, target, dv01_col=dv01_col, maturity_col=mat_col, tenor_col=ten_col)
-        
-        # Find biggest structure for this currency
-        biggest_structure_for_currency = ""
-        if stats.get("trade_structures") and stats.get('total_dv01', 0) > 0:
-            biggest_structure = stats["trade_structures"][0]  # Already sorted by DV01
-            dv01_k = format_dv01_k(biggest_structure['dv01'])
-            biggest_structure_for_currency = f"{biggest_structure['structure']} (~{dv01_k} DV01)"
-        
-        facts = facts_to_bullets(str(ccy), stats, biggest_structure_for_currency)
+    if not args.yesterday_only:
+        for ccy, g in day_df.groupby(ccy_col):
+            stats = summarize_currency(g, ccy_col, noz_col, target, dv01_col=dv01_col, maturity_col=mat_col, tenor_col=ten_col)
+            
+            # Find biggest structure for this currency
+            biggest_structure_for_currency = ""
+            if stats.get("trade_structures") and stats.get('total_dv01', 0) > 0:
+                biggest_structure = stats["trade_structures"][0]  # Already sorted by DV01
+                dv01_k = format_dv01_k(biggest_structure['dv01'])
+                biggest_structure_for_currency = f"{biggest_structure['structure']} (~{dv01_k} DV01)"
+            
+            facts = facts_to_bullets(str(ccy), stats, biggest_structure_for_currency)
 
-        # Always use GPT-4 for intelligent commentary
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": USER_PROMPT_TEMPLATE.format(ccy=str(ccy), facts=facts)}
-        ]
-        raw_commentary = call_openai(messages, model=args.model)
-        # Enforce 3 sentence limit and make copy-pasteable
-        commentary = enforce_sentence_limit(raw_commentary, max_sentences=3)
+            # Always use GPT-4 for intelligent commentary
+            messages = [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": USER_PROMPT_TEMPLATE.format(ccy=str(ccy), facts=facts)}
+            ]
+            raw_commentary = call_openai(messages, model=args.model)
+            # Enforce 3 sentence limit and make copy-pasteable
+            commentary = enforce_sentence_limit(raw_commentary, max_sentences=3)
 
-        outputs.append({"currency": str(ccy), "trade_date": target.strftime("%Y-%m-%d"), "commentary": commentary})
-        md_lines.append(f"**{ccy}** — {commentary}")
+            outputs.append({"currency": str(ccy), "trade_date": target.strftime("%Y-%m-%d"), "commentary": commentary})
+            md_lines.append(f"**{ccy}** — {commentary}")
 
-    out_df = pd.DataFrame(outputs, columns=["currency","trade_date","commentary"])
+    # Combine yesterday and today outputs for CSV
+    all_outputs = yesterday_outputs + outputs
+    out_df = pd.DataFrame(all_outputs, columns=["currency","trade_date","commentary"])
     out_df.to_csv(args.out_csv, index=False, encoding="utf-8")
-    with open(args.out_md, "w", encoding="utf-8") as f:
-        f.write("\n\n".join(md_lines))
-
-    print(f"Wrote {len(outputs)} commentaries to {args.out_csv} and {args.out_md}")
+    
+    # Combine yesterday and today markdown
+    if args.yesterday_only:
+        # Yesterday only
+        with open(args.out_md, "w", encoding="utf-8") as f:
+            f.write("\n\n".join(yesterday_md_lines))
+        print(f"Wrote {len(yesterday_outputs)} yesterday commentaries to {args.out_csv} and {args.out_md}")
+    else:
+        # Both or today only
+        combined_md_lines = yesterday_md_lines + [""] + md_lines
+        with open(args.out_md, "w", encoding="utf-8") as f:
+            f.write("\n\n".join(combined_md_lines))
+        
+        if yesterday_outputs:
+            print(f"Wrote {len(yesterday_outputs)} yesterday commentaries + {len(outputs)} today commentaries to {args.out_csv} and {args.out_md}")
+        else:
+            print(f"Wrote {len(outputs)} commentaries to {args.out_csv} and {args.out_md}")
 
 if __name__ == "__main__":
     main()
