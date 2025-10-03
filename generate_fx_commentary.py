@@ -257,14 +257,22 @@ def summarize_currency(df: pd.DataFrame,
     return out
 
 def format_dv01_k(value):
-    """Format DV01 value to nearest thousands with K suffix"""
+    """Format DV01 value to nearest thousands/millions with K/MM suffix"""
     if value == 0:
         return "0"
+    
     # Round to nearest thousand
     rounded = round(value / 1000) * 1000
-    if rounded >= 1000:
+    
+    if rounded >= 1_000_000:
+        # Format as millions with 3 decimal places
+        millions = rounded / 1_000_000
+        return f"{millions:.3f}MM"
+    elif rounded >= 1000:
+        # Format as thousands
         return f"{int(rounded/1000)}k"
     else:
+        # Less than 1000
         return f"{int(rounded)}"
 
 def facts_to_bullets(ccy: str, stats: Dict[str, Any], biggest_structure: str = "") -> str:
