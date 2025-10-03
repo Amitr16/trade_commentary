@@ -308,9 +308,10 @@ def facts_to_bullets(ccy: str, stats: Dict[str, Any], biggest_structure: str = "
     # Trade structures (most traded by DV01)
     if stats.get("trade_structures"):
         if stats.get('total_dv01', 0) > 0 and 'dv01' in stats["trade_structures"][0]:
-            # Use DV01 for trade structures
-            structures = ", ".join([f"{x['structure']} ({x['count']} trades, ~{format_dv01_k(x['dv01'])} DV01)" for x in stats["trade_structures"][:2]])
-            bullets.append(f"Most traded structures (by DV01): {structures}")
+            # Use DV01 for trade structures - filter out zero DV01
+            structures = ", ".join([f"{x['structure']} ({x['count']} trades, ~{format_dv01_k(x['dv01'])} DV01)" for x in stats["trade_structures"][:2] if x['dv01'] > 0])
+            if structures:
+                bullets.append(f"Most traded structures (by DV01): {structures}")
         elif 'notional' in stats["trade_structures"][0]:
             # Fallback to notional only if DV01 not available
             structures = ", ".join([f"{x['structure']} ({x['count']} trades, ~{x['notional']:,.0f})" for x in stats["trade_structures"][:2]])
@@ -318,9 +319,10 @@ def facts_to_bullets(ccy: str, stats: Dict[str, Any], biggest_structure: str = "
     
     if stats.get("maturity_clusters"):
         if stats.get('total_dv01', 0) > 0 and 'dv01' in stats["maturity_clusters"][0]:
-            # Use DV01 for maturity clusters
-            yrs = ", ".join([f"{x['year']} (~{format_dv01_k(x['dv01'])} DV01)" for x in stats["maturity_clusters"]])
-            bullets.append(f"Maturity clusters (by DV01): {yrs}")
+            # Use DV01 for maturity clusters - filter out zero DV01
+            yrs = ", ".join([f"{x['year']} (~{format_dv01_k(x['dv01'])} DV01)" for x in stats["maturity_clusters"] if x['dv01'] > 0])
+            if yrs:
+                bullets.append(f"Maturity clusters (by DV01): {yrs}")
         elif 'notional' in stats["maturity_clusters"][0]:
             # Fallback to notional only if DV01 not available
             yrs = ", ".join([f"{x['year']} (~{x['notional']:,.0f})" for x in stats["maturity_clusters"]])
@@ -332,31 +334,31 @@ def facts_to_bullets(ccy: str, stats: Dict[str, Any], biggest_structure: str = "
 # LLM prompt
 # -------------------------------
 SYSTEM_PROMPT = (
-    "You are a sell-side rates strategist writing intelligent, analytical commentary on daily swap activity by currency.\n"
+    "You are a sell-side rates strategist writing factual commentary on daily swap activity by currency.\n"
     "STRICT CONSTRAINTS:\n"
-    "- EXACTLY 3 sentences maximum. NO MORE.\n"
+    "- EXACTLY 2 sentences maximum. NO MORE.\n"
+    "- MAXIMUM 100 words total. Count words carefully.\n"
     "- Write as a single continuous block of text for easy copy-paste.\n"
     "CRITICAL STYLE REQUIREMENTS:\n"
-    "- Start with the biggest structure and provide intelligent analysis of what it means.\n"
-    "- Explain WHERE activity concentrates on the curve (belly/front/long end) and WHY this matters.\n"
-    "- Connect the dots between different tenor buckets and suggest what this indicates about market strategy.\n"
-    "- Use phrases like 'concentrated in', 'suggests', 'consistent with', 'indicating'.\n"
-    "- Focus on DV01 metrics and interpret their significance.\n"
-    "- Provide strategic insight about liability management, relative value, or hedging patterns.\n"
-    "- Be analytical and intelligent - explain the implications, not just list facts.\n"
-    "Tone: Professional, analytical, insightful. Avoid meaningless repetition or verbose explanations.\n"
+    "- Start with the biggest structure and describe what happened.\n"
+    "- State WHERE activity concentrates on the curve - be factual only.\n"
+    "- Focus on DV01 metrics and trade counts - report facts only.\n"
+    "- NO opinions, interpretations, or strategic insights.\n"
+    "- NO mention of 'suggests', 'indicating', 'possibly', 'potentially', 'likely', 'strategic positioning', 'relative value', 'liability management'.\n"
+    "- Be purely observational - report what happened, not what it means.\n"
+    "Tone: Factual, observational, concise. Avoid analysis or interpretation.\n"
 )
 
 USER_PROMPT_TEMPLATE = (
-    "Write intelligent, analytical commentary for {ccy} using these facts:\n\n"
+    "Write factual commentary for {ccy} using these facts:\n\n"
     "{facts}\n\n"
-    "REQUIREMENTS: Write as a single continuous block of text (no line breaks, no bullets, no paragraphs). EXACTLY 3 sentences maximum. Start with the BIGGEST STRUCTURE and provide strategic analysis. Connect the dots between different tenor buckets and explain what this activity suggests about market positioning, liability management, or relative value strategies. Be analytical and insightful, not just descriptive.\n"
+    "REQUIREMENTS: Write as a single continuous block of text (no line breaks, no bullets, no paragraphs). EXACTLY 2 sentences maximum. MAXIMUM 100 words total. Start with the BIGGEST STRUCTURE and report what happened. State where activity concentrated. Report DV01 amounts and trade counts. Be purely observational - NO analysis, interpretations, or strategic insights.\n"
 )
 
 # -------------------------------
 # OpenAI client (lazy import)
 # -------------------------------
-def call_openai(messages, model="gpt-4o", temperature=0.1, max_tokens=150):
+def call_openai(messages, model="gpt-4o", temperature=0.1, max_tokens=80):
     """Requires OPENAI_API_KEY in environment."""
     try:
         from openai import OpenAI
@@ -376,7 +378,7 @@ def call_openai(messages, model="gpt-4o", temperature=0.1, max_tokens=150):
     )
     return resp.choices[0].message.content.strip()
 
-def enforce_sentence_limit(text, max_sentences=3):
+def enforce_sentence_limit(text, max_sentences=2, max_words=100):
     """Enforce maximum sentence limit and make copy-pasteable"""
     # Remove verbose phrases
     text = text.replace("clustering of maturities", "maturities")
@@ -408,6 +410,11 @@ def enforce_sentence_limit(text, max_sentences=3):
     
     # Join with spaces for single line output
     result = ' '.join(sentences)
+    
+    # Enforce word limit
+    words = result.split()
+    if len(words) > max_words:
+        result = ' '.join(words[:max_words])
     
     # Ensure it ends with a period if it doesn't already
     if result and not result.rstrip().endswith(('.', '!', '?')):
@@ -519,6 +526,10 @@ def main():
             dv01_val = float(row[dv01_col]) if pd.notna(row[dv01_col]) else 0.0
             currency = str(row[ccy_col]).strip()
             
+            # Skip trades with zero DV01
+            if abs(dv01_val) <= 0:
+                continue
+            
             # Create structure description
             if effective_bucket_col and expiration_bucket_col and effective_bucket_col in last_hour_df.columns and expiration_bucket_col in last_hour_df.columns:
                 effective_bucket = str(row[effective_bucket_col]).strip() if pd.notna(row[effective_bucket_col]) else ""
@@ -584,6 +595,10 @@ def main():
                     for idx, row in yesterday_df.iterrows():
                         dv01_val = float(row[dv01_col]) if pd.notna(row[dv01_col]) else 0.0
                         currency = str(row[ccy_col]).strip()
+                        
+                        # Skip trades with zero DV01
+                        if abs(dv01_val) <= 0:
+                            continue
                         
                         # Create structure description
                         if effective_bucket_col and expiration_bucket_col and effective_bucket_col in yesterday_df.columns and expiration_bucket_col in yesterday_df.columns:
