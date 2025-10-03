@@ -358,7 +358,7 @@ USER_PROMPT_TEMPLATE = (
 # -------------------------------
 # OpenAI client (lazy import)
 # -------------------------------
-def call_openai(messages, model="gpt-4o", temperature=0.1, max_tokens=150):
+def call_openai(messages, model="gpt-4o", temperature=0.1, max_tokens=300):
     """Requires OPENAI_API_KEY in environment."""
     try:
         from openai import OpenAI
