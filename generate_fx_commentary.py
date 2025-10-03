@@ -256,6 +256,17 @@ def summarize_currency(df: pd.DataFrame,
 
     return out
 
+def format_dv01_k(value):
+    """Format DV01 value to nearest thousands with K suffix"""
+    if value == 0:
+        return "0"
+    # Round to nearest thousand
+    rounded = round(value / 1000) * 1000
+    if rounded >= 1000:
+        return f"{int(rounded/1000)}k"
+    else:
+        return f"{int(rounded)}"
+
 def facts_to_bullets(ccy: str, stats: Dict[str, Any], biggest_structure: str = "") -> str:
     bullets = []
     bullets.append(f"Currency: {ccy}")
@@ -268,8 +279,10 @@ def facts_to_bullets(ccy: str, stats: Dict[str, Any], biggest_structure: str = "
     
     # Use DV01 if available, otherwise fall back to notional
     if stats.get('total_dv01', 0) > 0:
-        bullets.append(f"Total DV01: ~{stats.get('total_dv01',0):,.0f} USD")
-        bullets.append(f"Average DV01 per trade: ~{stats.get('avg_dv01_per_trade',0):,.0f} USD")
+        total_dv01_k = format_dv01_k(stats.get('total_dv01', 0))
+        avg_dv01_k = format_dv01_k(stats.get('avg_dv01_per_trade', 0))
+        bullets.append(f"Total DV01: ~{total_dv01_k} USD")
+        bullets.append(f"Average DV01 per trade: ~{avg_dv01_k} USD")
     else:
         bullets.append(f"Total notional: ~{stats.get('total_notional',0):,.0f}")
         bullets.append(f"Average trade size: ~{stats.get('avg_trade_size',0):,.0f}")
@@ -277,7 +290,7 @@ def facts_to_bullets(ccy: str, stats: Dict[str, Any], biggest_structure: str = "
     if stats.get("top_buckets"):
         if stats.get('total_dv01', 0) > 0:
             # DV01-based buckets
-            tops = ", ".join([f"{b['bucket']} (~{b['dv01']:,.0f} DV01)" for b in stats["top_buckets"][:3]])
+            tops = ", ".join([f"{b['bucket']} (~{format_dv01_k(b['dv01'])} DV01)" for b in stats["top_buckets"][:3]])
             bullets.append(f"Top tenor buckets by DV01: {tops}")
         else:
             # Notional-based buckets
@@ -288,7 +301,7 @@ def facts_to_bullets(ccy: str, stats: Dict[str, Any], biggest_structure: str = "
     if stats.get("trade_structures"):
         if stats.get('total_dv01', 0) > 0 and 'dv01' in str(stats["trade_structures"]):
             # Use DV01 for trade structures
-            structures = ", ".join([f"{x['structure']} ({x['count']} trades, ~{x['dv01']:,.0f} DV01)" for x in stats["trade_structures"][:2]])
+            structures = ", ".join([f"{x['structure']} ({x['count']} trades, ~{format_dv01_k(x['dv01'])} DV01)" for x in stats["trade_structures"][:2]])
             bullets.append(f"Most traded structures (by DV01): {structures}")
         else:
             # Fallback to notional only if DV01 not available
@@ -298,7 +311,7 @@ def facts_to_bullets(ccy: str, stats: Dict[str, Any], biggest_structure: str = "
     if stats.get("maturity_clusters"):
         if stats.get('total_dv01', 0) > 0 and 'dv01' in str(stats["maturity_clusters"]):
             # Use DV01 for maturity clusters
-            yrs = ", ".join([f"{x['year']} (~{x['dv01']:,.0f} DV01)" for x in stats["maturity_clusters"]])
+            yrs = ", ".join([f"{x['year']} (~{format_dv01_k(x['dv01'])} DV01)" for x in stats["maturity_clusters"]])
             bullets.append(f"Maturity clusters (by DV01): {yrs}")
         else:
             # Fallback to notional only if DV01 not available
@@ -496,7 +509,8 @@ def main():
     if top_individual_trades:
         md_lines.append("## Top 5 Trades by DV01 (Past 1 Hour)")
         for i, trade in enumerate(top_individual_trades, 1):
-            md_lines.append(f"{i}. **{trade['structure']}** - ~{trade['dv01']:,.0f} DV01 ({trade['currency']})")
+            dv01_k = format_dv01_k(trade['dv01'])
+            md_lines.append(f"{i}. **{trade['structure']}** - ~{dv01_k} DV01 ({trade['currency']})")
         md_lines.append("")
     
     for ccy, g in day_df.groupby(ccy_col):
@@ -506,7 +520,8 @@ def main():
         biggest_structure_for_currency = ""
         if stats.get("trade_structures") and stats.get('total_dv01', 0) > 0:
             biggest_structure = stats["trade_structures"][0]  # Already sorted by DV01
-            biggest_structure_for_currency = f"{biggest_structure['structure']} (~{biggest_structure['dv01']:,.0f} DV01)"
+            dv01_k = format_dv01_k(biggest_structure['dv01'])
+            biggest_structure_for_currency = f"{biggest_structure['structure']} (~{dv01_k} DV01)"
         
         facts = facts_to_bullets(str(ccy), stats, biggest_structure_for_currency)
 
