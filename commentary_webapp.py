@@ -16,52 +16,88 @@ app = Flask(__name__)
 
 # Configuration
 CSV_FILE = "dtcc_trades.csv"
-COMMENTARY_CSV = "daily_commentary.csv"
-COMMENTARY_MD = "daily_commentary.md"
+TODAYS_COMMENTARY_CSV = "todays_commentary.csv"
+TODAYS_COMMENTARY_MD = "todays_commentary.md"
+YESTERDAYS_COMMENTARY_CSV = "yesterdays_commentary.csv"
+YESTERDAYS_COMMENTARY_MD = "yesterdays_commentary.md"
 
-def generate_commentary(date_filter=None, include_yesterday=False, yesterday_only=False):
-    """Generate commentary using the existing script"""
+def generate_todays_commentary(date_filter=None):
+    """Generate today's commentary"""
     try:
-        cmd = ["python", "generate_fx_commentary.py", CSV_FILE]
+        cmd = ["python", "generate_fx_commentary.py", CSV_FILE, "--out_csv", TODAYS_COMMENTARY_CSV, "--out_md", TODAYS_COMMENTARY_MD]
         if date_filter:
             cmd.extend(["--date", date_filter])
-        if include_yesterday:
-            cmd.append("--include_yesterday")
-        if yesterday_only:
-            cmd.append("--yesterday_only")
         
         # Run the commentary generation
         result = subprocess.run(cmd, capture_output=True, text=True)
         
         if result.returncode == 0:
-            return True, "Commentary generated successfully"
+            return True, "Today's commentary generated successfully"
         else:
             return False, f"Error: {result.stderr}"
             
     except Exception as e:
         return False, f"Exception: {str(e)}"
 
-def load_commentary_data():
-    """Load commentary data from CSV"""
+def generate_yesterdays_commentary():
+    """Generate yesterday's commentary"""
     try:
-        if os.path.exists(COMMENTARY_CSV):
-            df = pd.read_csv(COMMENTARY_CSV)
+        cmd = ["python", "generate_fx_commentary.py", CSV_FILE, "--yesterday_only", "--out_csv", YESTERDAYS_COMMENTARY_CSV, "--out_md", YESTERDAYS_COMMENTARY_MD]
+        
+        # Run the commentary generation
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            return True, "Yesterday's commentary generated successfully"
+        else:
+            return False, f"Error: {result.stderr}"
+            
+    except Exception as e:
+        return False, f"Exception: {str(e)}"
+
+def load_todays_commentary_data():
+    """Load today's commentary data from CSV"""
+    try:
+        if os.path.exists(TODAYS_COMMENTARY_CSV):
+            df = pd.read_csv(TODAYS_COMMENTARY_CSV)
             return df.to_dict('records')
         return []
     except Exception as e:
-        print(f"Error loading commentary: {e}")
+        print(f"Error loading today's commentary: {e}")
         return []
 
-def load_markdown_commentary():
-    """Load markdown commentary"""
+def load_yesterdays_commentary_data():
+    """Load yesterday's commentary data from CSV"""
     try:
-        if os.path.exists(COMMENTARY_MD):
-            with open(COMMENTARY_MD, 'r', encoding='utf-8') as f:
-                return f.read()
-        return "No commentary available"
+        if os.path.exists(YESTERDAYS_COMMENTARY_CSV):
+            df = pd.read_csv(YESTERDAYS_COMMENTARY_CSV)
+            return df.to_dict('records')
+        return []
     except Exception as e:
-        print(f"Error loading markdown: {e}")
-        return "Error loading commentary"
+        print(f"Error loading yesterday's commentary: {e}")
+        return []
+
+def load_todays_markdown_commentary():
+    """Load today's markdown commentary"""
+    try:
+        if os.path.exists(TODAYS_COMMENTARY_MD):
+            with open(TODAYS_COMMENTARY_MD, 'r', encoding='utf-8') as f:
+                return f.read()
+        return "No today's commentary available"
+    except Exception as e:
+        print(f"Error loading today's markdown: {e}")
+        return "Error loading today's commentary"
+
+def load_yesterdays_markdown_commentary():
+    """Load yesterday's markdown commentary"""
+    try:
+        if os.path.exists(YESTERDAYS_COMMENTARY_MD):
+            with open(YESTERDAYS_COMMENTARY_MD, 'r', encoding='utf-8') as f:
+                return f.read()
+        return "No yesterday's commentary available"
+    except Exception as e:
+        print(f"Error loading yesterday's markdown: {e}")
+        return "Error loading yesterday's commentary"
 
 def parse_top_trades(markdown_content):
     """Extract top 5 trades from markdown content"""
@@ -119,49 +155,44 @@ def index():
 
 @app.route('/commentary')
 def commentary():
-    """Display commentary page"""
-    markdown_content = load_markdown_commentary()
-    html_content = markdown_to_html(markdown_content)
+    """Display commentary page with tabs"""
+    todays_markdown = load_todays_markdown_commentary()
+    todays_html = markdown_to_html(todays_markdown)
+    
+    yesterdays_markdown = load_yesterdays_markdown_commentary()
+    yesterdays_html = markdown_to_html(yesterdays_markdown)
+    
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     return render_template('commentary.html', 
-                         markdown_content=html_content,
+                         todays_content=todays_html,
+                         yesterdays_content=yesterdays_html,
                          current_time=current_time)
 
-@app.route('/generate', methods=['POST'])
-def generate():
-    """Generate new commentary"""
-    date_filter = request.form.get('date')
-    
-    success, message = generate_commentary(date_filter)
-    
-    if success:
-        return redirect(url_for('commentary'))
-    else:
-        return render_template('error.html', error=message)
-
-@app.route('/api/commentary')
-def api_commentary():
-    """API endpoint for commentary data"""
-    commentary_data = load_commentary_data()
-    return jsonify(commentary_data)
-
-@app.route('/api/refresh', methods=['POST'])
-def api_refresh():
-    """API endpoint to refresh commentary"""
+@app.route('/api/refresh_today', methods=['POST'])
+def api_refresh_today():
+    """API endpoint to refresh today's commentary"""
     if request.json:
         date_filter = request.json.get('date')
-        include_yesterday = request.json.get('include_yesterday', False)
-        yesterday_only = request.json.get('yesterday_only', False)
     else:
         date_filter = None
-        include_yesterday = False
-        yesterday_only = False
     
-    success, message = generate_commentary(date_filter, include_yesterday, yesterday_only)
+    success, message = generate_todays_commentary(date_filter)
     
     if success:
-        markdown_content = load_markdown_commentary()
+        markdown_content = load_todays_markdown_commentary()
+        html_content = markdown_to_html(markdown_content)
+        return jsonify({"success": True, "html_content": html_content})
+    else:
+        return jsonify({"success": False, "error": message})
+
+@app.route('/api/refresh_yesterday', methods=['POST'])
+def api_refresh_yesterday():
+    """API endpoint to refresh yesterday's commentary"""
+    success, message = generate_yesterdays_commentary()
+    
+    if success:
+        markdown_content = load_yesterdays_markdown_commentary()
         html_content = markdown_to_html(markdown_content)
         return jsonify({"success": True, "html_content": html_content})
     else:

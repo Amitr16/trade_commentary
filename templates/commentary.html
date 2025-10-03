@@ -32,6 +32,39 @@
             color: #333;
             margin: 0;
         }
+        .timestamp {
+            color: #666;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e9ecef;
+            margin-bottom: 20px;
+        }
+        .tab {
+            background-color: #f8f9fa;
+            border: none;
+            padding: 12px 24px;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 8px 8px 0 0;
+            margin-right: 5px;
+            transition: background-color 0.3s;
+        }
+        .tab.active {
+            background-color: #007bff;
+            color: white;
+        }
+        .tab:hover:not(.active) {
+            background-color: #e9ecef;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
         .refresh-btn {
             background-color: #28a745;
             color: white;
@@ -49,28 +82,44 @@
             background-color: #6c757d;
             cursor: not-allowed;
         }
-        .yesterday-btn {
-            background-color: #dc3545;
+        .back-btn {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #007bff;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .back-btn:hover {
+            text-decoration: underline;
+        }
+        .copy-instruction {
+            background-color: #e7f3ff;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #0066cc;
+            border-left: 3px solid #007bff;
+        }
+        .copy-btn {
+            background-color: #28a745;
             color: white;
             border: none;
-            padding: 12px 24px;
-            border-radius: 5px;
+            padding: 8px 12px;
+            border-radius: 4px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 12px;
             margin-left: 10px;
             transition: background-color 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
         }
-        .yesterday-btn:hover {
-            background-color: #c82333;
+        .copy-btn:hover {
+            background-color: #1e7e34;
         }
-        .yesterday-btn:disabled {
-            background-color: #6c757d;
-            cursor: not-allowed;
-        }
-        .timestamp {
-            color: #666;
-            font-size: 14px;
-            margin-top: 10px;
+        .copy-btn.success {
+            background-color: #007bff;
         }
         .commentary-content {
             background-color: #f8f9fa;
@@ -116,60 +165,6 @@
             border-radius: 5px;
             margin: 20px 0;
         }
-        .back-btn {
-            display: inline-block;
-            margin-bottom: 20px;
-            color: #007bff;
-            text-decoration: none;
-            font-weight: bold;
-        }
-        .back-btn:hover {
-            text-decoration: underline;
-        }
-        .copy-instruction {
-            background-color: #e7f3ff;
-            padding: 10px 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            font-size: 14px;
-            color: #0066cc;
-            border-left: 3px solid #007bff;
-        }
-        .copy-btn {
-            background-color: #28a745;
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            margin-left: 10px;
-            transition: background-color 0.3s;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-        }
-        .copy-btn:hover {
-            background-color: #1e7e34;
-        }
-        .copy-btn.success {
-            background-color: #007bff;
-        }
-        .currency-section {
-            margin-bottom: 20px;
-            padding: 15px;
-            border: 1px solid #e9ecef;
-            border-radius: 8px;
-            position: relative;
-        }
-        .currency-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-            font-weight: bold;
-            font-size: 16px;
-        }
         .page-header {
             display: flex;
             justify-content: space-between;
@@ -185,40 +180,78 @@
                 <h1>Daily Trade Commentary</h1>
                 <div class="timestamp">Last updated: {{ current_time }}</div>
             </div>
-            <div>
-                <button class="refresh-btn" onclick="refreshCommentary()">Refresh Commentary</button>
-                <button class="yesterday-btn" onclick="refreshYesterdayCommentary()">Yesterday Commentary</button>
-            </div>
         </div>
 
         <a href="/" class="back-btn">← Back to Dashboard</a>
 
-        <div class="page-header">
-            <div class="copy-instruction">
-                📋 <strong>Copy Instructions:</strong> Use the copy buttons to copy individual currency sections or the entire page.
-            </div>
-            <button class="copy-btn" onclick="copyAllContent()" id="copyAllBtn">
-                📋 Copy All
-            </button>
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('today')">Today's Commentary</button>
+            <button class="tab" onclick="switchTab('yesterday')">Yesterday's Commentary</button>
         </div>
 
-        <div class="commentary-content" id="commentary-content">
-            {{ markdown_content | safe }}
+        <!-- Today's Commentary Tab -->
+        <div id="today-content" class="tab-content active">
+            <div class="page-header">
+                <div class="copy-instruction">
+                    📋 <strong>Copy Instructions:</strong> Use the copy buttons to copy individual currency sections or the entire page.
+                </div>
+                <button class="copy-btn" onclick="copyAllContent('today')" id="copyTodayBtn">
+                    📋 Copy All
+                </button>
+            </div>
+            <button class="refresh-btn" onclick="refreshTodayCommentary()">Refresh Today's Commentary</button>
+            <div class="commentary-content" id="today-commentary-content">
+                {{ todays_content | safe }}
+            </div>
+        </div>
+
+        <!-- Yesterday's Commentary Tab -->
+        <div id="yesterday-content" class="tab-content">
+            <div class="page-header">
+                <div class="copy-instruction">
+                    📋 <strong>Copy Instructions:</strong> Use the copy buttons to copy individual currency sections or the entire page.
+                </div>
+                <button class="copy-btn" onclick="copyAllContent('yesterday')" id="copyYesterdayBtn">
+                    📋 Copy All
+                </button>
+            </div>
+            <button class="refresh-btn" onclick="refreshYesterdayCommentary()">Refresh Yesterday's Commentary</button>
+            <div class="commentary-content" id="yesterday-commentary-content">
+                {{ yesterdays_content | safe }}
+            </div>
         </div>
     </div>
 
     <script>
-        function refreshCommentary() {
-            const btn = document.querySelector('.refresh-btn');
-            const content = document.getElementById('commentary-content');
+        function switchTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabName + '-content').classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+        }
+
+        function refreshTodayCommentary() {
+            const btn = document.querySelector('#today-content .refresh-btn');
+            const content = document.getElementById('today-commentary-content');
             
             // Disable button and show loading
             btn.disabled = true;
             btn.textContent = 'Refreshing...';
-            content.innerHTML = '<div class="loading">Generating new commentary... This may take a moment.</div>';
+            content.innerHTML = '<div class="loading">Generating today\'s commentary... This may take a moment.</div>';
             
             // Make API call
-            fetch('/api/refresh', {
+            fetch('/api/refresh_today', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -234,7 +267,7 @@
                     document.querySelector('.timestamp').textContent = 
                         'Last updated: ' + now.toLocaleString();
                     // Re-initialize copy buttons for new content
-                    addCurrencyCopyButtons();
+                    addCurrencyCopyButtons('today');
                 } else {
                     content.innerHTML = '<div class="error">Error: ' + data.error + '</div>';
                 }
@@ -245,26 +278,26 @@
             .finally(() => {
                 // Re-enable button
                 btn.disabled = false;
-                btn.textContent = 'Refresh Commentary';
+                btn.textContent = 'Refresh Today\'s Commentary';
             });
         }
 
         function refreshYesterdayCommentary() {
-            const btn = document.querySelector('.yesterday-btn');
-            const content = document.getElementById('commentary-content');
+            const btn = document.querySelector('#yesterday-content .refresh-btn');
+            const content = document.getElementById('yesterday-commentary-content');
             
             // Disable button and show loading
             btn.disabled = true;
-            btn.textContent = 'Generating...';
-            content.innerHTML = '<div class="loading">Generating yesterday commentary... This may take a moment.</div>';
+            btn.textContent = 'Refreshing...';
+            content.innerHTML = '<div class="loading">Generating yesterday\'s commentary... This may take a moment.</div>';
             
-            // Make API call for yesterday only
-            fetch('/api/refresh', {
+            // Make API call
+            fetch('/api/refresh_yesterday', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({yesterday_only: true})
+                body: JSON.stringify({})
             })
             .then(response => response.json())
             .then(data => {
@@ -275,7 +308,7 @@
                     document.querySelector('.timestamp').textContent = 
                         'Last updated: ' + now.toLocaleString();
                     // Re-initialize copy buttons for new content
-                    addCurrencyCopyButtons();
+                    addCurrencyCopyButtons('yesterday');
                 } else {
                     content.innerHTML = '<div class="error">Error: ' + data.error + '</div>';
                 }
@@ -286,15 +319,15 @@
             .finally(() => {
                 // Re-enable button
                 btn.disabled = false;
-                btn.textContent = 'Yesterday Commentary';
+                btn.textContent = 'Refresh Yesterday\'s Commentary';
             });
         }
 
         // Copy all content function
-        function copyAllContent() {
-            const content = document.getElementById('commentary-content').innerText;
+        function copyAllContent(tab) {
+            const content = document.getElementById(tab + '-commentary-content').innerText;
             navigator.clipboard.writeText(content).then(() => {
-                const btn = document.getElementById('copyAllBtn');
+                const btn = document.getElementById(`copy${tab.charAt(0).toUpperCase() + tab.slice(1)}Btn`);
                 const originalText = btn.innerHTML;
                 btn.innerHTML = '✅ Copied!';
                 btn.classList.add('success');
@@ -309,8 +342,8 @@
         }
 
         // Copy individual currency section function
-        function copyCurrencySection(currency, button) {
-            const content = document.getElementById('commentary-content').innerText;
+        function copyCurrencySection(currency, button, tab) {
+            const content = document.getElementById(tab + '-commentary-content').innerText;
             const lines = content.split('\n');
             let currencyText = '';
             let inCurrencySection = false;
@@ -341,8 +374,8 @@
         }
 
         // Parse commentary and add copy buttons for each currency
-        function addCurrencyCopyButtons() {
-            const content = document.getElementById('commentary-content');
+        function addCurrencyCopyButtons(tab) {
+            const content = document.getElementById(tab + '-commentary-content');
             const html = content.innerHTML;
             
             // Find all currency sections (lines starting with **CCY**)
@@ -359,14 +392,17 @@
             currencies.forEach(currency => {
                 const pattern = new RegExp(`(\\*\\*${currency}\\*\\*[^\\n]*)`, 'g');
                 newHtml = newHtml.replace(pattern, 
-                    `$1 <button class="copy-btn" onclick="copyCurrencySection('${currency}', this)">📋 Copy</button>`);
+                    `$1 <button class="copy-btn" onclick="copyCurrencySection('${currency}', this, '${tab}')">📋 Copy</button>`);
             });
             
             content.innerHTML = newHtml;
         }
 
         // Initialize copy buttons when page loads
-        document.addEventListener('DOMContentLoaded', addCurrencyCopyButtons);
+        document.addEventListener('DOMContentLoaded', function() {
+            addCurrencyCopyButtons('today');
+            addCurrencyCopyButtons('yesterday');
+        });
     </script>
 </body>
 </html>

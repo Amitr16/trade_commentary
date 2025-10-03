@@ -1,0 +1,23 @@
+# Day-End Commentary (2025-10-02)
+
+
+
+## Top 5 Trades on 2025-10-02
+
+1. **Z5 → 2027-12-17** - ~13.966MM DV01 (KRW)
+
+2. **6M → 2027-03-31** - ~81k DV01 (EUR)
+
+3. **6M → 2031-03-31** - ~44k DV01 (EUR)
+
+4. **Spot → 2025-11-03** - ~0 DV01 (MXN)
+
+5. **1Y → 1Y** - ~0 DV01 (EUR)
+
+
+
+**EUR** — The largest structure in EUR swaps on October 2, 2025, was the 6M → 2027-03-31, concentrated in the 0-2Y bucket with a significant ~81k DV01, suggesting a strategic focus on short-term liability management or hedging against near-term rate movements. This concentration in the front end, coupled with the secondary focus on the 3-5Y bucket (~44k DV01) through the 6M → 2031-03-31 structure, indicates a tactical approach to managing medium-term rate exposure, possibly reflecting expectations of a steepening yield curve or relative value opportunities in the belly. The absence of activity in the 0-9M bucket and the clustering of.
+
+**KRW** — The KRW swap market on October 2, 2025, was dominated by a single trade in the Z5 structure maturing on December 17, 2027, with a substantial DV01 of approximately 13. 966MM USD, indicating a concentrated focus on the short end of the curve within the 0-2Y tenor bucket. This concentration suggests a strategic emphasis on managing near-term liabilities or exploiting relative value opportunities in the short-term rates environment, potentially reflecting expectations of rate movements or hedging against short-term volatility.
+
+**MXN** — The MXN swap market on October 2, 2025, saw a singular trade with a substantial notional of approximately 494. 7 million, indicating a significant, targeted position rather than broad-based activity. This concentration in a single trade suggests a strategic move, potentially for liability management or a specific hedging requirement, rather than a reflection of broader market sentiment across the curve.
