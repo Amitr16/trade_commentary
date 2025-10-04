@@ -25,6 +25,7 @@ CANDIDATE_COLS = {
     "expiration_bucket": ["expiration_bucket", "expiration bucket", "end_bucket", "end bucket", "maturity_bucket"],
     "tenor": ["tenor", "term", "tenor_yrs", "tenor_years"],
     "side": ["side", "buy_sell", "direction"],
+    "rate": ["rate", "swap_rate", "fixed_rate", "coupon_rate", "interest_rate"],
 }
 
 def find_col(df: pd.DataFrame, logical: str) -> Optional[str]:
@@ -443,6 +444,7 @@ def main():
     dv01_col = find_col(df, "dv01")
     mat_col = find_col(df, "maturity")
     ten_col = find_col(df, "tenor")
+    rate_col = find_col(df, "rate")
 
     missing = [name for name, col in [("currency", ccy_col), ("trade_date", td_col), ("notional", noz_col)] if col is None]
     if missing:
@@ -529,16 +531,26 @@ def main():
             if abs(dv01_val) <= 0:
                 continue
             
+            # Get rate information
+            rate_info = ""
+            if rate_col and rate_col in last_hour_df.columns and pd.notna(row[rate_col]):
+                try:
+                    rate_val = float(row[rate_col])
+                    rate_percent = rate_val * 100
+                    rate_info = f" @ {rate_percent:.2f}%"
+                except (ValueError, TypeError):
+                    rate_info = ""
+            
             # Create structure description
             if effective_bucket_col and expiration_bucket_col and effective_bucket_col in last_hour_df.columns and expiration_bucket_col in last_hour_df.columns:
                 effective_bucket = str(row[effective_bucket_col]).strip() if pd.notna(row[effective_bucket_col]) else ""
                 expiration_bucket = str(row[expiration_bucket_col]).strip() if pd.notna(row[expiration_bucket_col]) else ""
                 if effective_bucket and expiration_bucket:
-                    structure_desc = f"{effective_bucket} → {expiration_bucket}"
+                    structure_desc = f"{effective_bucket} → {expiration_bucket}{rate_info}"
                 else:
-                    structure_desc = f"{currency} trade"
+                    structure_desc = f"{currency} trade{rate_info}"
             else:
-                structure_desc = f"{currency} trade"
+                structure_desc = f"{currency} trade{rate_info}"
             
             trades_with_dv01.append({
                 "structure": structure_desc,
@@ -599,16 +611,26 @@ def main():
                         if abs(dv01_val) <= 0:
                             continue
                         
+                        # Get rate information
+                        rate_info = ""
+                        if rate_col and rate_col in yesterday_df.columns and pd.notna(row[rate_col]):
+                            try:
+                                rate_val = float(row[rate_col])
+                                rate_percent = rate_val * 100
+                                rate_info = f" @ {rate_percent:.2f}%"
+                            except (ValueError, TypeError):
+                                rate_info = ""
+                        
                         # Create structure description
                         if effective_bucket_col and expiration_bucket_col and effective_bucket_col in yesterday_df.columns and expiration_bucket_col in yesterday_df.columns:
                             effective_bucket = str(row[effective_bucket_col]).strip() if pd.notna(row[effective_bucket_col]) else ""
                             expiration_bucket = str(row[expiration_bucket_col]).strip() if pd.notna(row[expiration_bucket_col]) else ""
                             if effective_bucket and expiration_bucket:
-                                structure_desc = f"{effective_bucket} → {expiration_bucket}"
+                                structure_desc = f"{effective_bucket} → {expiration_bucket}{rate_info}"
                             else:
-                                structure_desc = f"{currency} trade"
+                                structure_desc = f"{currency} trade{rate_info}"
                         else:
-                            structure_desc = f"{currency} trade"
+                            structure_desc = f"{currency} trade{rate_info}"
                         
                         yesterday_trades_with_dv01.append({
                             "structure": structure_desc,
